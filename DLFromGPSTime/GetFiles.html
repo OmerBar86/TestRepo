@@ -1,1 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Time Calculator (1980-01-01 Epoch)</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better readability and mobile touch targets */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .input-group input {
+            /* Increase touch target size */
+            padding: 0.75rem 1rem;
+            text-align: center;
+        }
+        /* Style for the result card */
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body class="p-4 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-lg bg-white shadow-xl rounded-2xl p-6 md:p-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">GPS Time Converter</h1>
+        <p class="text-sm text-gray-500 mb-6">Calculates time relative to the 1980-01-01 epoch, as specified.</p>
+
+        <!-- Input Section -->
+        <div class="mb-6">
+            <label class="block text-gray-700 font-semibold mb-2">Enter Date (YYYY / MM / DD)</label>
+            <div id="input-group" class="flex gap-2 input-group">
+                <input id="input-year" type="number" placeholder="YYYY" min="1980" max="2100" class="w-1/3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150" value="2024">
+                <input id="input-month" type="number" placeholder="MM" min="1" max="12" class="w-1/3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150" value="06">
+                <input id="input-day" type="number" placeholder="DD" min="1" max="31" class="w-1/3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150" value="15">
+            </div>
+            <p id="error-message" class="text-red-500 text-sm mt-2 hidden">Please enter a valid date on or after 1980-01-01.</p>
+        </div>
+        
+        <!-- Calculation Button -->
+        <button onclick="calculateGPSTime()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition duration-300 mb-6">
+            Calculate GPS Time
+        </button>
+
+        <!-- Results Display Section -->
+        <div id="results-card" class="bg-gray-50 p-6 rounded-xl border border-gray-200 hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Calculation Results</h2>
+            
+            <div class="result-item">
+                <span class="text-gray-600 font-medium">GPS Week Number (Wk)</span>
+                <span id="result-week" class="text-blue-600 text-lg font-extrabold">--</span>
+            </div>
+
+            <div class="result-item">
+                <span class="text-gray-600 font-medium">Day of the Week (DoW)</span>
+                <span id="result-dow" class="text-blue-600 text-lg font-extrabold">--</span>
+            </div>
+            
+            <div class="result-item">
+                <span class="text-gray-600 font-medium">Day of the Year (DoY)</span>
+                <span id="result-doy" class="text-blue-600 text-lg font-extrabold">--</span>
+            </div>
+
+        </div>
+
+        <div id="message-box" class="mt-4 p-3 bg-yellow-100 text-yellow-800 rounded-lg text-sm hidden">
+             <!-- Used for non-alert messages -->
+        </div>
+    </div>
+
+    <script>
+        // Use a fixed epoch start date as specified by the user: 1980-01-01
+        const EPOCH_START_DATE = new Date('1980-01-01T00:00:00Z');
+        // Time constant for milliseconds in a day
+        const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+        /**
+         * Converts the user input into a Date object and performs validation.
+         * @returns {Date|null} The validated Date object or null if invalid.
+         */
+        function validateAndGetDate() {
+            const year = document.getElementById('input-year').value;
+            const month = document.getElementById('input-month').value;
+            const day = document.getElementById('input-day').value;
+            const errorMessage = document.getElementById('error-message');
+
+            // Attempt to create a date object. The Date constructor handles invalid dates (like Feb 30)
+            const inputDate = new Date(`${year}-${month}-${day}T00:00:00Z`);
+
+            // Check if the date is valid (e.g., prevents "Invalid Date" or overflow issues)
+            if (isNaN(inputDate.getTime()) || year < 1980) {
+                errorMessage.textContent = "Please ensure the date is valid and is 1980 or later.";
+                errorMessage.classList.remove('hidden');
+                return null;
+            }
+
+            // Check for date consistency (e.g., if user enters 2024-02-30, the Date object becomes 2024-03-01)
+            // This checks if the parsed Date object's components match the input components
+            if (inputDate.getUTCFullYear() !== parseInt(year) ||
+                inputDate.getUTCMonth() !== parseInt(month) - 1 ||
+                inputDate.getUTCDate() !== parseInt(day)) {
+                errorMessage.textContent = `Date entered (${year}-${month}-${day}) is invalid. Check month/day combination.`;
+                errorMessage.classList.remove('hidden');
+                return null;
+            }
+
+            // Ensure the input date is not before the epoch
+            if (inputDate.getTime() < EPOCH_START_DATE.getTime()) {
+                errorMessage.textContent = "The date must be on or after 1980-01-01.";
+                errorMessage.classList.remove('hidden');
+                return null;
+            }
+            
+            errorMessage.classList.add('hidden');
+            return inputDate;
+        }
+
+        /**
+         * Calculates the GPS time components based on the user-provided date.
+         */
+        function calculateGPSTime() {
+            const inputDate = validateAndGetDate();
+            const resultsCard = document.getElementById('results-card');
+            
+            if (!inputDate) {
+                resultsCard.classList.add('hidden');
+                return;
+            }
+
+            // 1. Calculate Total Days Elapsed from 1980-01-01 (EPOCH)
+            // Use UTC values for accurate day count
+            const timeDifferenceMs = inputDate.getTime() - EPOCH_START_DATE.getTime();
+            const totalDaysSinceEpoch = Math.floor(timeDifferenceMs / MS_PER_DAY);
+
+            // 2. Compute GPS Week Number (Wk)
+            // Week Number = floor(Total Days / 7)
+            const gpsWeekNumber = Math.floor(totalDaysSinceEpoch / 7);
+
+            // 3. Compute Day of the Week (DoW)
+            // Day of Week = Total Days % 7
+            const dayOfWeek = totalDaysSinceEpoch % 7; 
+            // Note: The result (0-6) maps to the day sequence starting from 1980-01-01, which was a Tuesday.
+            
+            // 4. Compute Day of the Year (DoY)
+            // Days passed from the beginning of the input year to the input date.
+            const startOfYear = new Date(inputDate.getUTCFullYear(), 0, 1);
+            const timeDiffToStartOfYearMs = inputDate.getTime() - startOfYear.getTime();
+            const dayOfYear = Math.floor(timeDiffToStartOfYearMs / MS_PER_DAY) + 1; // +1 to make it 1-based (Jan 1 is day 1)
+
+            // Display Results
+            document.getElementById('result-week').textContent = gpsWeekNumber.toString();
+            document.getElementById('result-dow').textContent = `${dayOfWeek} (Relative to Epoch Start)`;
+            document.getElementById('result-doy').textContent = dayOfYear.toString();
+            
+            resultsCard.classList.remove('hidden');
+
+            // Optional: Show a message about the difference from standard GPS
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = "Note: Standard GPS time starts on 1980-01-06. This calculator uses 1980-01-01 as requested.";
+            messageBox.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
 
