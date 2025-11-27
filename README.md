@@ -1,2 +1,2 @@
 # TestRepo
-For testings only
+For testings and view pages
