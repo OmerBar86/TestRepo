@@ -1,2 +1,2 @@
 # TestRepo
-For testings
+For testings only
